@@ -6,6 +6,8 @@ using Discord.WebSocket;
 using FreneticUtilities.FreneticToolkit;
 using FreneticUtilities.FreneticDataSyntax;
 using FreneticUtilities.FreneticExtensions;
+using System.Net.Http.Headers;
+using Discord.Rest;
 
 namespace SimpleDiscordAIBot;
 
@@ -14,7 +16,35 @@ public static class ConfigHandler
     public static FDSSection Config = FDSUtility.ReadFile("config/config.fds");
 }
 
-public class LLMParams
+public static class Util
+{
+    public static ByteArrayContent JSONContent(JObject jobj)
+    {
+        ByteArrayContent content = new(jobj.ToString(Formatting.None).EncodeUTF8());
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        return content;
+    }
+
+    public static JObject ParseToJson(this string input)
+    {
+        try
+        {
+            return JObject.Parse(input);
+        }
+        catch (JsonReaderException ex)
+        {
+            throw new JsonReaderException($"Failed to parse JSON `{input.Replace("\n", "  ")}`: {ex.Message}");
+        }
+    }
+
+    /// <summary>Sends a JSON object post and receives a JSON object back.</summary>
+    public static async Task<JObject> PostJson(this HttpClient client, string url, JObject data)
+    {
+        return (await (await client.PostAsync(url, JSONContent(data))).Content.ReadAsStringAsync()).ParseToJson();
+    }
+}
+
+public record class LLMParams
 {
     public int max_new_tokens = 1000;
     public bool do_sample = true;
@@ -34,6 +64,81 @@ public class LLMParams
     public bool add_bos_token = false;
     public bool skip_special_tokens = true;
     public string[] stopping_strings = Array.Empty<string>();
+}
+
+public static class SwarmAPI
+{
+    public static HttpClient Client = new();
+
+    public static string Session = "";
+
+    public static string Address => ConfigHandler.Config.GetString("swarm_url");
+
+    static SwarmAPI()
+    {
+        Client.DefaultRequestHeaders.Add("user-agent", "SimpleDiscordAIBot/1.0");
+    }
+
+    public class SessionInvalidException : Exception
+    {
+    }
+
+    public static async Task GetSession()
+    {
+        JObject sessData = await Client.PostJson($"{Address}/API/GetNewSession", new());
+        Session = sessData["session_id"].ToString();
+    }
+
+    public static async Task<List<byte[]>> SendRequest(string prompt)
+    {
+        string model = ConfigHandler.Config.GetString("swarm_model");
+        return await RunWithSession(async () =>
+        {
+            JObject request = new()
+            {
+                ["images"] = 1,
+                ["session_id"] = Session,
+                ["donotsave"] = true,
+                ["prompt"] = prompt,
+                ["negativeprompt"] = ConfigHandler.Config.GetString("image_negative"),
+                ["model"] = model,
+                ["width"] = ConfigHandler.Config.GetInt("image_width"),
+                ["height"] = ConfigHandler.Config.GetInt("image_height"),
+                ["cfgscale"] = ConfigHandler.Config.GetDouble("image_cfg"),
+                ["steps"] = ConfigHandler.Config.GetInt("image_steps"),
+                ["seed"] = -1
+            };
+            JObject generated = await Client.PostJson($"{Address}/API/GenerateText2Image", request);
+            if (generated.TryGetValue("error_id", out JToken errorId) && errorId.ToString() == "invalid_session_id")
+            {
+                throw new SessionInvalidException();
+            }
+            List<byte[]> images = generated["images"].Select(img => Convert.FromBase64String(img.ToString().After(";base64,"))).ToList();
+            Console.WriteLine($"Generate {images.Count} images");
+            if (images.Count == 0)
+            {
+                Console.WriteLine($"Raw response was: {generated}");
+            }
+            return images;
+        });
+    }
+
+    public static async Task<T> RunWithSession<T>(Func<Task<T>> call)
+    {
+        if (string.IsNullOrWhiteSpace(Session))
+        {
+            await GetSession();
+        }
+        try
+        {
+            return await call();
+        }
+        catch (SessionInvalidException)
+        {
+            await GetSession();
+            return await call();
+        }
+    }
 }
 
 public static class TextGenAPI
@@ -136,24 +241,8 @@ public static class Program
                     return;
                 }
                 string rawUser = AlphanumericMatcher.TrimToMatches(message.Author.Username);
-                string user = rawUser;
-                if (user.Length < 3)
-                {
-                }
-                ulong guild = guildChannel.GuildId;
-                string prePrompt = ConfigHandler.Config.GetString($"guilds.{guild}.preprompt");
-                if (prePrompt is null)
-                {
-                    prePrompt = ConfigHandler.Config.GetString($"guilds.*.preprompt");
-                    if (prePrompt is null)
-                    {
-                        Console.WriteLine("Bad guild");
-                        return;
-                    }
-                }
-                prePrompt = ConfigHandler.Config.GetStringList($"pre_prompts.{prePrompt}").JoinString("\n");
                 string prefix = ConfigHandler.Config.GetString("prefix");
-                user = prefix + ConfigHandler.Config.GetString("user_name_default");
+                string user = prefix + ConfigHandler.Config.GetString("user_name_default");
                 string botName = prefix + ConfigHandler.Config.GetString("bot_name");
                 string prior = "";
                 bool isSelfRef = message.Content.Contains($"<@{Client.CurrentUser.Id}>") || message.Content.Contains($"<@!{Client.CurrentUser.Id}>");
@@ -196,8 +285,35 @@ public static class Program
                 {
                     return;
                 }
-                prePrompt = prePrompt.Replace("{{user}}", user).Replace("{{username}}", rawUser).Replace("{{bot}}", botName).Replace("{{date}}", DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm")) + "\n";
                 string input = message.Content.Replace($"<@{Client.CurrentUser.Id}>", "").Replace($"<@!{Client.CurrentUser.Id}>", "").Trim();
+                bool doImage = false, llmImage = false;
+                string promptType = "preprompt";
+                if (input.StartsWith("[image]"))
+                {
+                    doImage = true;
+                    llmImage = true;
+                    promptType = "image_preprompt";
+                    input = input.After("[image]").Trim();
+                }
+                if (input.StartsWith("[rawimage]"))
+                {
+                    doImage = true;
+                    llmImage = false;
+                    promptType = "image_preprompt";
+                    input = input.After("[rawimage]").Trim();
+                }
+                string prePrompt = ConfigHandler.Config.GetString($"guilds.{guildChannel.GuildId}.{promptType}");
+                if (prePrompt is null)
+                {
+                    prePrompt = ConfigHandler.Config.GetString($"guilds.*.{promptType}");
+                    if (prePrompt is null)
+                    {
+                        Console.WriteLine("Bad guild");
+                        return;
+                    }
+                }
+                prePrompt = ConfigHandler.Config.GetStringList($"pre_prompts.{prePrompt}").JoinString("\n");
+                prePrompt = prePrompt.Replace("{{user}}", user).Replace("{{username}}", rawUser).Replace("{{char}}", botName).Replace("{{bot}}", botName).Replace("{{date}}", DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm")) + "\n";
                 Console.WriteLine($"Got input: {prior} {input}");
                 if (input.StartsWith("[nopreprompt]"))
                 {
@@ -210,7 +326,8 @@ public static class Program
                 }
                 using (message.Channel.EnterTypingState())
                 {
-                    string res = await TextGenAPI.SendRequest($"{prePrompt}{prior}{user}: {input}\n{botName}:", llmParams);
+                    LLMParams paramsToUse = doImage ? llmParams with { max_new_tokens = Math.Min(llmParams.max_new_tokens, 256) } : llmParams;
+                    string res = (doImage && !llmImage) ? input : await TextGenAPI.SendRequest($"{prePrompt}{prior}{user}: {input}\n{botName}:", paramsToUse);
                     int line = res.IndexOf("\n#");
                     if (line != -1)
                     {
@@ -227,7 +344,27 @@ public static class Program
                     {
                         res = "[Error]";
                     }
-                    await (message as IUserMessage).ReplyAsync(res, allowedMentions: AllowedMentions.None);
+                    if (!doImage)
+                    {
+                        await (message as IUserMessage).ReplyAsync(res, allowedMentions: AllowedMentions.None);
+                        return;
+                    }
+                    EmbedBuilder embedded = new EmbedBuilder() { Description = "(Please wait, generating...)" }.WithFooter(res);
+                    IUserMessage botMessage = await (message as IUserMessage).ReplyAsync(embed: embedded.Build(), allowedMentions: AllowedMentions.None);
+                    List<byte[]> imgs = await SwarmAPI.SendRequest(res);
+                    if (imgs.Count == 0)
+                    {
+                        embedded.Description = "Failed to generate :(";
+                    }
+                    else
+                    {
+                        embedded.Description = $"<@{message.Author.Id}>'s AI-generated image";
+                        ulong logChan = ConfigHandler.Config.GetUlong("image_log_channel").Value;
+                        using MemoryStream imgStream = new(imgs[0]);
+                        RestUserMessage msg = await (Client.GetChannel(logChan) as SocketTextChannel).SendFileAsync(imgStream, $"generated_img_for_{message.Author.Id}.jpg");
+                        embedded.ImageUrl = msg.Attachments.First().Url;
+                    }
+                    await botMessage.ModifyAsync(m => m.Embed = embedded.Build());
                 }
             }
             catch (Exception ex)
