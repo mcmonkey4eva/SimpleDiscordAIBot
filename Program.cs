@@ -51,7 +51,7 @@ public record class LLMParams
     public float temperature = 0.7f;
     public float top_p = 0.1f;
     public float typical_p = 1;
-    public float repetition_penalty = 1.18f;
+    public float repetition_penalty = 1.1f;
     public float encoder_repetition_penalty = 1.0f;
     public int top_k = 40;
     public int min_length = 0;
@@ -361,7 +361,7 @@ public static class Program
                         embedded.Description = $"<@{message.Author.Id}>'s AI-generated image";
                         ulong logChan = ConfigHandler.Config.GetUlong("image_log_channel").Value;
                         using MemoryStream imgStream = new(imgs[0]);
-                        RestUserMessage msg = await (Client.GetChannel(logChan) as SocketTextChannel).SendFileAsync(imgStream, $"generated_img_for_{message.Author.Id}.jpg");
+                        RestUserMessage msg = await (Client.GetChannel(logChan) as SocketTextChannel).SendFileAsync(imgStream, $"generated_img_for_{message.Author.Id}.jpg", text: botMessage.GetJumpUrl());
                         embedded.ImageUrl = msg.Attachments.First().Url;
                     }
                     await botMessage.ModifyAsync(m => m.Embed = embedded.Build());
