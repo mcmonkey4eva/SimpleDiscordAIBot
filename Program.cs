@@ -358,7 +358,7 @@ public static class Program
                     }
                     EmbedBuilder embedded = new EmbedBuilder() { Description = "(Please wait, generating...)" }.WithFooter(res);
                     IUserMessage botMessage = await (message as IUserMessage).ReplyAsync(embed: embedded.Build(), allowedMentions: AllowedMentions.None);
-                    List<byte[]> imgs = await SwarmAPI.SendRequest(res);
+                    List<byte[]> imgs = await SwarmAPI.SendRequest(res.Replace("<", "").Replace(':', '_'));
                     if (imgs.Count == 0)
                     {
                         embedded.Description = "Failed to generate :(";
