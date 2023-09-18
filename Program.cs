@@ -209,7 +209,12 @@ public static class Program
             MessageCache[id] = null;
             return null;
         }
-        CachedMessage cache = new(message.Content, message.Reference?.MessageId.GetValueOrDefault(0) ?? 0, message.Author?.Id ?? 0, message.Author?.Username ?? "");
+        string content = message.Content;
+        if (message.Embeds is not null && message.Embeds.Count == 1 && !string.IsNullOrWhiteSpace(message.Embeds.First().Footer?.Text))
+        {
+            content = message.Embeds.First().Footer.Value.Text;
+        }
+        CachedMessage cache = new(content, message.Reference?.MessageId.GetValueOrDefault(0) ?? 0, message.Author?.Id ?? 0, message.Author?.Username ?? "");
         MessageCache[id] = cache;
         return cache;
     }
