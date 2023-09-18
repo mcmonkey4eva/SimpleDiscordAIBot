@@ -51,8 +51,9 @@ public record class LLMParams
     public float temperature = 0.7f;
     public float top_p = 0.1f;
     public float typical_p = 1;
-    public float repetition_penalty = 1.1f;
+    public float repetition_penalty = 1.3f;
     public float encoder_repetition_penalty = 1.0f;
+    public int repetition_penalty_range = 30;
     public int top_k = 40;
     public int min_length = 0;
     public int no_repeat_ngram_size = 0;
@@ -161,6 +162,7 @@ public static class TextGenAPI
             ["top_p"] = llmParam.top_p,
             ["typical_p"] = llmParam.typical_p,
             ["repetition_penalty"] = llmParam.repetition_penalty,
+            ["repetition_penalty_range"] = llmParam.repetition_penalty_range,
             ["encoder_repetition_penalty"] = llmParam.encoder_repetition_penalty,
             ["top_k"] = llmParam.top_k,
             ["min_length"] = llmParam.min_length,
