@@ -297,21 +297,20 @@ public static class Program
                     return;
                 }
                 string input = message.Content.Replace($"<@{Client.CurrentUser.Id}>", "").Replace($"<@!{Client.CurrentUser.Id}>", "").Trim();
-                bool doImage = false, llmImage = false;
+                bool doImage = false;
                 string promptType = "preprompt";
-                if (input.StartsWith("[image]"))
+                string imagePrompt = null;
+                FDSSection imagePrefixSection = ConfigHandler.Config.GetSection("prefixes");
+                foreach (string imgPrefix in imagePrefixSection.GetRootKeys())
                 {
-                    doImage = true;
-                    llmImage = true;
-                    promptType = "image_preprompt";
-                    input = input.After("[image]").Trim();
-                }
-                if (input.StartsWith("[rawimage]"))
-                {
-                    doImage = true;
-                    llmImage = false;
-                    promptType = "image_preprompt";
-                    input = input.After("[rawimage]").Trim();
+                    if (input.StartsWith(imgPrefix))
+                    {
+                        imagePrompt = imagePrefixSection.GetString(imgPrefix);
+                        doImage = true;
+                        promptType = "image_preprompt";
+                        input = input[imgPrefix.Length..].Trim();
+                        break;
+                    }
                 }
                 string prePrompt = ConfigHandler.Config.GetString($"guilds.{guildChannel.GuildId}.{promptType}");
                 if (prePrompt is null)
@@ -338,7 +337,7 @@ public static class Program
                 using (message.Channel.EnterTypingState())
                 {
                     LLMParams paramsToUse = doImage ? llmParams with { max_new_tokens = Math.Min(llmParams.max_new_tokens, 256) } : llmParams;
-                    string res = (doImage && !llmImage) ? input : await TextGenAPI.SendRequest($"{prePrompt}{prior}{user}: {input}\n{botName}:", paramsToUse);
+                    string res = (doImage && !imagePrompt.Contains("{llm_prompt}")) ? input : await TextGenAPI.SendRequest($"{prePrompt}{prior}{user}: {input}\n{botName}:", paramsToUse);
                     int line = res.IndexOf("\n#");
                     if (line != -1)
                     {
@@ -361,8 +360,9 @@ public static class Program
                         return;
                     }
                     EmbedBuilder embedded = new EmbedBuilder() { Description = "(Please wait, generating...)" }.WithFooter(res);
+                    string actualPrompt = imagePrompt.Replace(imagePrompt.Contains("{llm_prompt}") ? "{llm_prompt}" : "{prompt}", res.Replace("<", "").Replace(':', '_'));
                     IUserMessage botMessage = await (message as IUserMessage).ReplyAsync(embed: embedded.Build(), allowedMentions: AllowedMentions.None);
-                    List<byte[]> imgs = await SwarmAPI.SendRequest(res.Replace("<", "").Replace(':', '_'));
+                    List<byte[]> imgs = await SwarmAPI.SendRequest(actualPrompt);
                     if (imgs.Count == 0)
                     {
                         embedded.Description = "Failed to generate :(";

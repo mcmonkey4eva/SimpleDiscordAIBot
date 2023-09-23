@@ -59,6 +59,12 @@ use_aitemplate: false
 discord_token: abc123
 image_log_channel: 123456
 
+# Message prefixes to image prompt format. You can apply presets n wotnot, standard StableSwarmUI prompt format.
+prefixes:
+    [image]: {llm_prompt}
+    [rawimage]: {prompt}
+    [otherimage]: {prompt} <preset:some_preset_here>
+
 pre_prompts:
     example:
     - ### System: Conversation log between an online user interested in AI technology, and an experienced AI developer named Llama trying their best to help. Llama uses markdown syntax to add helpeful emphasis. Llama never uses URLs. Llama tries to be extremely kind and professional.
