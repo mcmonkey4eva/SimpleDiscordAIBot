@@ -109,6 +109,10 @@ public static class SwarmAPI
                 ["steps"] = ConfigHandler.Config.GetInt("image_steps"),
                 ["seed"] = -1
             };
+            if (ConfigHandler.Config.GetBool("use_aitemplate", false).Value)
+            {
+                request["enableaitemplate"] = true;
+            }
             JObject generated = await Client.PostJson($"{Address}/API/GenerateText2Image", request);
             if (generated.TryGetValue("error_id", out JToken errorId) && errorId.ToString() == "invalid_session_id")
             {

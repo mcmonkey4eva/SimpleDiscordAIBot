@@ -52,6 +52,8 @@ image_height: 1024
 image_cfg: 7
 image_steps: 20
 image_negative: nsfw, low quality
+# Set true if your swarm instance has aitemplate and you want it. On modern NV cards, AIT is noticeably faster than not having AIT.
+use_aitemplate: false
 
 # Discord
 discord_token: abc123
