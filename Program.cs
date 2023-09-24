@@ -223,6 +223,8 @@ public static class Program
         return cache;
     }
 
+    public record struct MessageHolder(bool IsBot, string Name, string Text);
+
     public static void Main()
     {
         Console.WriteLine("Starting...");
@@ -255,8 +257,8 @@ public static class Program
                 string prefix = ConfigHandler.Config.GetString("prefix");
                 string user = prefix + ConfigHandler.Config.GetString("user_name_default");
                 string botName = prefix + ConfigHandler.Config.GetString("bot_name");
-                string prior = "";
                 bool isSelfRef = message.Content.Contains($"<@{Client.CurrentUser.Id}>") || message.Content.Contains($"<@!{Client.CurrentUser.Id}>");
+                List<MessageHolder> priors = new();
                 if (message.Reference is not null && message.Reference.ChannelId == message.Channel.Id)
                 {
                     CachedMessage cache = await GetMessageCached(message.Channel.Id, message.Reference.MessageId.Value);
@@ -268,7 +270,7 @@ public static class Program
                     int count = 0;
                     while (refMessage is not null)
                     {
-                        if (count++ > 50)
+                        if (count++ > 20)
                         {
                             break;
                         }
@@ -288,7 +290,8 @@ public static class Program
                             aname = ConfigHandler.Config.GetString("user_name_default");
                         }
                         string msgRef = ref2.Content.Replace($"<@{Client.CurrentUser.Id}>", "").Replace($"<@!{Client.CurrentUser.Id}>", "").Trim();
-                        prior = $"{prefix}{aname}: {msgRef}\n{botName}: {refMessage.Content}\n{prior}";
+                        priors.Add(new(true, botName, refMessage.Content));
+                        priors.Add(new(false, $"{prefix}{aname}", msgRef));
                         refMessage = ref2.RefId == 0 ? null : await GetMessageCached(message.Channel.Id, ref2.RefId);
                     }
                 }
@@ -296,43 +299,69 @@ public static class Program
                 {
                     return;
                 }
+                string prior = priors.Select(m => $"{m.Name}: {m.Text}\n").Reverse().JoinString("");
                 string input = message.Content.Replace($"<@{Client.CurrentUser.Id}>", "").Replace($"<@!{Client.CurrentUser.Id}>", "").Trim();
-                bool doImage = false;
-                string promptType = "preprompt";
-                string imagePrompt = null;
-                FDSSection imagePrefixSection = ConfigHandler.Config.GetSection("prefixes");
-                foreach (string imgPrefix in imagePrefixSection.GetRootKeys())
-                {
-                    if (input.StartsWith(imgPrefix))
-                    {
-                        imagePrompt = imagePrefixSection.GetString(imgPrefix);
-                        doImage = true;
-                        promptType = "image_preprompt";
-                        input = input[imgPrefix.Length..].Trim();
-                        break;
-                    }
-                }
-                string prePrompt = ConfigHandler.Config.GetString($"guilds.{guildChannel.GuildId}.{promptType}");
-                if (prePrompt is null)
-                {
-                    prePrompt = ConfigHandler.Config.GetString($"guilds.*.{promptType}");
-                    if (prePrompt is null)
-                    {
-                        Console.WriteLine("Bad guild");
-                        return;
-                    }
-                }
-                prePrompt = ConfigHandler.Config.GetStringList($"pre_prompts.{prePrompt}").JoinString("\n");
-                prePrompt = prePrompt.Replace("{{user}}", user).Replace("{{username}}", rawUser).Replace("{{char}}", botName).Replace("{{bot}}", botName).Replace("{{date}}", DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm")) + "\n";
                 Console.WriteLine($"Got input: {prior} {input}");
+                bool doImage = false;
+                string imagePrompt = null;
+                string prePrompt = "";
+                string FillPromptTags(string prompt)
+                {
+                    return prompt.Replace("{{user}}", user).Replace("{{username}}", rawUser).Replace("{{char}}", botName).Replace("{{bot}}", botName).Replace("{{date}}", DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm"));
+                }
                 if (input.StartsWith("[nopreprompt]"))
                 {
-                    prePrompt = "";
                     input = input["[nopreprompt]".Length..].Trim();
                 }
                 else
                 {
                     input = input.Replace("\n", " ");
+                    string promptType = "preprompt";
+                    FDSSection imagePrefixSection = ConfigHandler.Config.GetSection("prefixes");
+                    foreach (string imgPrefix in imagePrefixSection.GetRootKeys())
+                    {
+                        if (input.StartsWith(imgPrefix))
+                        {
+                            imagePrompt = imagePrefixSection.GetString(imgPrefix);
+                            doImage = true;
+                            promptType = "image_preprompt";
+                            input = input[imgPrefix.Length..].Trim();
+                            break;
+                        }
+                    }
+                    if (!doImage && input.StartsWith("[text]"))
+                    {
+                        input = input["[text]".Length..].Trim();
+                    }
+                    else if (!doImage)
+                    {
+                        string isImagePrompt = ConfigHandler.Config.GetString($"guilds.{guildChannel.GuildId}.is_image_prompt");
+                        if (isImagePrompt is not null)
+                        {
+                            string isImagePromptText = FillPromptTags(ConfigHandler.Config.GetStringList($"pre_prompts.{isImagePrompt}").JoinString("\n") + "\n");
+                            string priorShort = priors.Take(2).Select(m => $"{(m.IsBot ? "Bot" : "User")}: {m.Text}\n").Reverse().JoinString("");
+                            LLMParams paramsToUse = llmParams with { max_new_tokens = 5, repetition_penalty = 1 };
+                            string isImageAnswer = await TextGenAPI.SendRequest($"{isImagePromptText}{priorShort}User: {input}\n{botName}:", paramsToUse);
+                            Console.WriteLine($"Got is image answer for '{input}': {isImageAnswer}");
+                            if (isImageAnswer.ToLowerFast().Trim().Contains("image"))
+                            {
+                                doImage = true;
+                                promptType = "image_preprompt";
+                                imagePrompt = "{llm_prompt}";
+                            }
+                        }
+                    }
+                    prePrompt = ConfigHandler.Config.GetString($"guilds.{guildChannel.GuildId}.{promptType}");
+                    if (prePrompt is null)
+                    {
+                        prePrompt = ConfigHandler.Config.GetString($"guilds.*.{promptType}");
+                        if (prePrompt is null)
+                        {
+                            Console.WriteLine("Bad guild");
+                            return;
+                        }
+                    }
+                    prePrompt = FillPromptTags(ConfigHandler.Config.GetStringList($"pre_prompts.{prePrompt}").JoinString("\n") + "\n");
                 }
                 using (message.Channel.EnterTypingState())
                 {
