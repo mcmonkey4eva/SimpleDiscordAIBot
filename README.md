@@ -78,11 +78,27 @@ pre_prompts:
     - {{bot}}: raw photo, close up shot of a brown furry cat wandering through a grassy forest, bokeh, hd
     - {{user}}: some cool environment like a dead city
     - {{bot}}: concept art of an ancient ruined city filled with concrete rubble of once-great statues, post-apocalyptic, highly stylized, video game concept art, moody atmosphere, magical
+    is_image_prompt:
+    - ### System: You will respond 'image' if the user's final message in a conversation is requesting image generation (asking for an image explicitly, describing an image, or requesting a modification to an image), or 'other' if they are doing anything else (such as asking a question, giving commentary, holding conversation, or etc.)
+    - ### Log
+    - User: Hello, how are you?
+    - {{bot}}: other
+    - ### Log
+    - User: draw a cow
+    - {{bot}}: image
+    - ### Log
+    - User: what is a cow?
+    - {{bot}}: other
+    - ### Log
+    - User: an astronaut on the moon
+    - {{bot}}: image
+    - ### Log
 
 guilds:
     123:
         preprompt: example
         image_preprompt: images
+        is_image_prompt: is_image_prompt
 ```
 
 - Fill in `textgen_url` with the URL to the blocking API for your text-gen-webui server.
@@ -92,6 +108,7 @@ guilds:
 - Fill in `guilds` with a mapping of Guild ID numbers (use Discord dev mode to get those) to settings. Mostly just the reference the preprompt ID.
     - You can set a guild ID of `*` as a catch-all for any unlisted guilds the bot is in.
     - You can set `image_preprompt` to a preprompt that is used for generating images. If present, image generation is allowed. If not preset, image generation is refused.
+    - you can set `is_image_prompt` to build a preprompt for letting the LLM decide on its own whether to do text reply or image reply. Note that the bot should be told to say either `other` or `image` based on its choice.
     - `image_log_channel` must be set to a real channel somewhere to work
 - Configure the other things how you want. The example above configured for the format that [StableBeluga](https://huggingface.co/stabilityai/StableBeluga2) uses.
 
