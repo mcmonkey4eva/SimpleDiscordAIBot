@@ -90,7 +90,7 @@ public static class SwarmAPI
         Session = sessData["session_id"].ToString();
     }
 
-    public static async Task<List<byte[]>> SendRequest(string prompt)
+    public static async Task<List<(byte[], string)>> SendRequest(string prompt)
     {
         string model = ConfigHandler.Config.GetString("swarm_model");
         return await RunWithSession(async () =>
@@ -118,7 +118,13 @@ public static class SwarmAPI
             {
                 throw new SessionInvalidException();
             }
-            List<byte[]> images = generated["images"].Select(img => Convert.FromBase64String(img.ToString().After(";base64,"))).ToList();
+            List<(byte[], string)> images = generated["images"].Select(img =>
+            {
+                string type = img.ToString().After("data:").Before(";");
+                string ext = type == "image/gif" ? "gif" : "jpg";
+                byte[] data = Convert.FromBase64String(img.ToString().After(";base64,"));
+                return (data, ext);
+            }).ToList();
             Console.WriteLine($"Generate {images.Count} images");
             if (images.Count == 0)
             {
@@ -391,7 +397,7 @@ public static class Program
                     EmbedBuilder embedded = new EmbedBuilder() { Description = "(Please wait, generating...)" }.WithFooter(res);
                     string actualPrompt = imagePrompt.Replace(imagePrompt.Contains("{llm_prompt}") ? "{llm_prompt}" : "{prompt}", res.Replace("<", "").Replace(':', '_'));
                     IUserMessage botMessage = await (message as IUserMessage).ReplyAsync(embed: embedded.Build(), allowedMentions: AllowedMentions.None);
-                    List<byte[]> imgs = await SwarmAPI.SendRequest(actualPrompt);
+                    List<(byte[], string)> imgs = await SwarmAPI.SendRequest(actualPrompt);
                     if (imgs.Count == 0)
                     {
                         embedded.Description = "Failed to generate :(";
@@ -400,8 +406,8 @@ public static class Program
                     {
                         embedded.Description = $"<@{message.Author.Id}>'s AI-generated image";
                         ulong logChan = ConfigHandler.Config.GetUlong("image_log_channel").Value;
-                        using MemoryStream imgStream = new(imgs[0]);
-                        RestUserMessage msg = await (Client.GetChannel(logChan) as SocketTextChannel).SendFileAsync(imgStream, $"generated_img_for_{message.Author.Id}.jpg", text: botMessage.GetJumpUrl());
+                        using MemoryStream imgStream = new(imgs[0].Item1);
+                        RestUserMessage msg = await (Client.GetChannel(logChan) as SocketTextChannel).SendFileAsync(imgStream, $"generated_img_for_{message.Author.Id}.{imgs[0].Item2}", text: botMessage.GetJumpUrl());
                         embedded.ImageUrl = msg.Attachments.First().Url;
                     }
                     await botMessage.ModifyAsync(m => m.Embed = embedded.Build());
