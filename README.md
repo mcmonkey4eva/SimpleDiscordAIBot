@@ -60,6 +60,7 @@ discord_token: abc123
 image_log_channel: 123456
 
 # Message prefixes to image prompt format. You can apply presets n wotnot, standard StableSwarmUI prompt format.
+# Remove this section if you don't want images.
 prefixes:
     [image]: {llm_prompt}
     [rawimage]: {prompt}
@@ -97,7 +98,9 @@ pre_prompts:
 guilds:
     123:
         preprompt: example
+        # You can leave this off if you're not generating images
         image_preprompt: images
+        # You can leave this off if you're not autodetecting image requests.
         is_image_prompt: is_image_prompt
 ```
 

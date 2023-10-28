@@ -324,15 +324,18 @@ public static class Program
                     input = input.Replace("\n", " ");
                     string promptType = "preprompt";
                     FDSSection imagePrefixSection = ConfigHandler.Config.GetSection("prefixes");
-                    foreach (string imgPrefix in imagePrefixSection.GetRootKeys())
+                    if (imagePrefixSection is not null)
                     {
-                        if (input.StartsWith(imgPrefix))
+                        foreach (string imgPrefix in imagePrefixSection.GetRootKeys())
                         {
-                            imagePrompt = imagePrefixSection.GetString(imgPrefix);
-                            doImage = true;
-                            promptType = "image_preprompt";
-                            input = input[imgPrefix.Length..].Trim();
-                            break;
+                            if (input.StartsWith(imgPrefix))
+                            {
+                                imagePrompt = imagePrefixSection.GetString(imgPrefix);
+                                doImage = true;
+                                promptType = "image_preprompt";
+                                input = input[imgPrefix.Length..].Trim();
+                                break;
+                            }
                         }
                     }
                     if (!doImage && input.StartsWith("[text]"))
