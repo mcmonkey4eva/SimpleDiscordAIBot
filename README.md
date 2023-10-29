@@ -37,6 +37,8 @@ It's hardcoded to use the tools I prefer (eg text-gen-webui), so, if you want di
 ```yml
 # Text-Generation-WebUI
 textgen_url: http://127.0.0.1:7861
+# Max timeout for a text response, in minutes.
+textgen_timeout: 2
 max_new_tokens: 1000
 stopping_strings:
 - \n###
@@ -47,6 +49,8 @@ prefix: \x### \x
 # StableSwarmUI
 swarm_url: http://127.0.0.1:7801
 swarm_model: OfficialStableDiffusion/sd_xl_base_1.0.safetensors
+# Max timeout for an image response, in minutes.
+swarm_timeout: 2
 image_width: 1024
 image_height: 1024
 image_cfg: 7

@@ -78,6 +78,7 @@ public static class SwarmAPI
     static SwarmAPI()
     {
         Client.DefaultRequestHeaders.Add("user-agent", "SimpleDiscordAIBot/1.0");
+        Client.Timeout = TimeSpan.FromMinutes(ConfigHandler.Config.GetFloat("swarm_timeout", 2).Value);
     }
 
     public class SessionInvalidException : Exception
@@ -159,6 +160,7 @@ public static class TextGenAPI
     static TextGenAPI()
     {
         Client.DefaultRequestHeaders.Add("user-agent", "SimpleDiscordAIBot/1.0");
+        Client.Timeout = TimeSpan.FromMinutes(ConfigHandler.Config.GetFloat("textgen_timeout", 2).Value);
     }
 
     public static async Task<string> SendRequest(string prompt, LLMParams llmParam)
