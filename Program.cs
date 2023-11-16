@@ -49,7 +49,7 @@ public record class LLMParams
     public int max_new_tokens = 1000;
     public bool do_sample = true;
     public float temperature = 0.7f;
-    public float top_p = 0.1f;
+    public float top_p = 0.9f;
     public float typical_p = 1;
     public float repetition_penalty = 1.3f;
     public float encoder_repetition_penalty = 1.0f;
@@ -168,7 +168,7 @@ public static class TextGenAPI
         JObject jData = new()
         {
             ["prompt"] = prompt,
-            ["max_new_tokens"] = llmParam.max_new_tokens,
+            ["max_tokens"] = llmParam.max_new_tokens,
             ["do_sample"] = llmParam.do_sample,
             ["temperature"] = llmParam.temperature,
             ["top_p"] = llmParam.top_p,
@@ -190,10 +190,10 @@ public static class TextGenAPI
         };
         string serialized = JsonConvert.SerializeObject(jData);
         Console.WriteLine($"will send: {serialized}");
-        HttpResponseMessage response = await Client.PostAsync($"{ConfigHandler.Config.GetString("textgen_url")}/api/v1/generate", new StringContent(serialized, StringConversionHelper.UTF8Encoding, "application/json"));
+        HttpResponseMessage response = await Client.PostAsync($"{ConfigHandler.Config.GetString("textgen_url")}/v1/completions", new StringContent(serialized, StringConversionHelper.UTF8Encoding, "application/json"));
         string responseText = await response.Content.ReadAsStringAsync();
         Console.WriteLine($"Response {(int)response.StatusCode} {response.StatusCode} text: {responseText}");
-        string result = JObject.Parse(responseText)["results"][0]["text"].ToString();
+        string result = JObject.Parse(responseText)["choices"][0]["text"].ToString();
         return result;
     }
 }
