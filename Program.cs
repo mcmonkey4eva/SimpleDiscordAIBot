@@ -428,9 +428,9 @@ public static class Program
                                 img.Mutate(m => m.DrawImage(isImgs[i], new Point(x, y), 1));
                             }
                             using MemoryStream imgStream2 = new();
-                            img.SaveAsPng(imgStream2);
+                            img.SaveAsJpeg(imgStream2);
                             imgStream2.Position = 0;
-                            imgs = new() { (imgStream2.ToArray(), "png") };
+                            imgs = new() { (imgStream2.ToArray(), "jpg") };
                         }
                         embedded.Description = $"<@{message.Author.Id}>'s AI-generated image";
                         ulong logChan = ConfigHandler.Config.GetUlong("image_log_channel").Value;
