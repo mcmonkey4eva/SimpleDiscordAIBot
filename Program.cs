@@ -8,6 +8,7 @@ using FreneticUtilities.FreneticDataSyntax;
 using FreneticUtilities.FreneticExtensions;
 using System.Net.Http.Headers;
 using Discord.Rest;
+using ISImage = SixLabors.ImageSharp.Image;
 
 namespace SimpleDiscordAIBot;
 
@@ -98,7 +99,7 @@ public static class SwarmAPI
         {
             JObject request = new()
             {
-                ["images"] = 1,
+                ["images"] = ConfigHandler.Config.GetInt("images", 1),
                 ["session_id"] = Session,
                 ["donotsave"] = true,
                 ["prompt"] = prompt,
@@ -409,6 +410,28 @@ public static class Program
                     }
                     else
                     {
+                        if (imgs.Count > 1)
+                        {
+                            ISImage[] isImgs = imgs.Select(i => ISImage.Load(i.Item1)).ToArray();
+                            int sqrt = (int)Math.Ceiling(Math.Sqrt(isImgs.Length));
+                            int width = 0, height = 0;
+                            for (int i = 0; i < isImgs.Length; i++)
+                            {
+                                width = Math.Max(width, isImgs[i].Width);
+                                height = Math.Max(height, isImgs[i].Height);
+                            }
+                            int rows = (int)Math.Ceiling((double)isImgs.Length / sqrt);
+                            using Image<Rgba32> img = new(width * sqrt, height * rows);
+                            for (int i = 0; i < isImgs.Length; i++)
+                            {
+                                int x = (i % sqrt) * width, y = (i / sqrt) * height;
+                                img.Mutate(m => m.DrawImage(isImgs[i], new Point(x, y), 1));
+                            }
+                            using MemoryStream imgStream2 = new();
+                            img.SaveAsPng(imgStream2);
+                            imgStream2.Position = 0;
+                            imgs = new() { (imgStream2.ToArray(), "png") };
+                        }
                         embedded.Description = $"<@{message.Author.Id}>'s AI-generated image";
                         ulong logChan = ConfigHandler.Config.GetUlong("image_log_channel").Value;
                         using MemoryStream imgStream = new(imgs[0].Item1);

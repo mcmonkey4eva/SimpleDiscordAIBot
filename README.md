@@ -49,6 +49,7 @@ prefix: \x### \x
 # StableSwarmUI
 swarm_url: http://127.0.0.1:7801
 swarm_model: OfficialStableDiffusion/sd_xl_base_1.0.safetensors
+images: 1
 # Max timeout for an image response, in minutes.
 swarm_timeout: 2
 image_width: 1024
