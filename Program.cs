@@ -359,7 +359,7 @@ public static class Program
                             {
                                 doImage = true;
                                 promptType = "image_preprompt";
-                                imagePrompt = "{llm_prompt}";
+                                imagePrompt = ConfigHandler.Config.GetString("prefixes.[image]", "{llm_prompt}");
                             }
                         }
                     }
