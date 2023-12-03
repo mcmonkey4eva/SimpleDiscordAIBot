@@ -46,6 +46,12 @@ user_name_default: Human
 bot_name: Assistant
 prefix: \x### \x
 
+# Optionally, configure any text gen params you want. Anything text-generation-webui shows under Parameters is valid here.
+textgen_params:
+    top_p: 0.9
+    top_k: 0
+    min_p: 0.1
+
 # StableSwarmUI
 swarm_url: http://127.0.0.1:7801
 swarm_model: OfficialStableDiffusion/sd_xl_base_1.0.safetensors

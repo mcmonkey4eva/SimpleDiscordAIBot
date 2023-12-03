@@ -52,10 +52,11 @@ public record class LLMParams
     public float temperature = 0.7f;
     public float top_p = 0.9f;
     public float typical_p = 1;
+    public float min_p = 0.1f;
     public float repetition_penalty = 1.3f;
     public float encoder_repetition_penalty = 1.0f;
     public int repetition_penalty_range = 30;
-    public int top_k = 40;
+    public int top_k = 0;
     public int min_length = 0;
     public int no_repeat_ngram_size = 0;
     public int num_beams = 1;
@@ -173,6 +174,7 @@ public static class TextGenAPI
             ["do_sample"] = llmParam.do_sample,
             ["temperature"] = llmParam.temperature,
             ["top_p"] = llmParam.top_p,
+            ["min_p"] = llmParam.min_p,
             ["typical_p"] = llmParam.typical_p,
             ["repetition_penalty"] = llmParam.repetition_penalty,
             ["repetition_penalty_range"] = llmParam.repetition_penalty_range,
@@ -189,6 +191,24 @@ public static class TextGenAPI
             ["skip_special_tokens"] = llmParam.skip_special_tokens,
             ["stopping_strings"] = JToken.FromObject(llmParam.stopping_strings)
         };
+        FDSSection otherParams = ConfigHandler.Config.GetSection("textgen_params");
+        if (otherParams is not null)
+        {
+            foreach (string key in otherParams.GetRootKeys())
+            {
+                FDSData val = otherParams.GetRootData(key);
+                jData[key] = val.Internal switch
+                {
+                    string str => str,
+                    int i => i,
+                    long l => l,
+                    float f => f,
+                    double d => d,
+                    bool b => b,
+                    _ => throw new Exception($"Unknown type {val.Internal.GetType()} for {key}")
+                };
+            }
+        }
         string serialized = JsonConvert.SerializeObject(jData);
         Console.WriteLine($"will send: {serialized}");
         HttpResponseMessage response = await Client.PostAsync($"{ConfigHandler.Config.GetString("textgen_url")}/v1/completions", new StringContent(serialized, StringConversionHelper.UTF8Encoding, "application/json"));
