@@ -189,7 +189,7 @@ public static class TextGenAPI
             ["seed"] = llmParam.seed,
             ["add_bos_token"] = llmParam.add_bos_token,
             ["skip_special_tokens"] = llmParam.skip_special_tokens,
-            ["stopping_strings"] = JToken.FromObject(llmParam.stopping_strings)
+            ["custom_stopping_strings"] = JArray.FromObject(llmParam.stopping_strings)
         };
         FDSSection otherParams = ConfigHandler.Config.GetSection("textgen_params");
         if (otherParams is not null)

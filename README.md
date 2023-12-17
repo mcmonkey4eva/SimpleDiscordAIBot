@@ -51,6 +51,7 @@ textgen_params:
     top_p: 0.9
     top_k: 0
     min_p: 0.1
+    temperature_last: true
 
 # StableSwarmUI
 swarm_url: http://127.0.0.1:7801
