@@ -28,7 +28,12 @@ It's hardcoded to use the tools I prefer (eg text-gen-webui), so, if you want di
 - [DotNET SDK 7.0](https://dotnet.microsoft.com/en-us/download/dotnet/7.0)
 - [Text-Generation-WebUI](https://github.com/oobabooga/text-generation-webui) for running the LLM (Language Model) backend part, with a model of your choosing installed on it and working. Launch it with `--api --api-blocking-port 7861` (feel free to choose your own port, just don't reuse the main UI's port. Also don't expose it to the open internet)
 - [StableSwarmUI](https://github.com/Stability-AI/StableSwarmUI) if you want image generation. Launch it as normal. Make sure it's visible to the bot, and probably not to the open internet.
-    - You're on your own for dealing with VRAM conflict between the two AI different servers, my setup is fine so I don't have offloading. I'd accept a PR about it though.
+    - If the Swarm instance is on the same GPU and you want to avoid VRAM issues:
+        - in the Backends tab edit Comfy and add `--disable-smart-memory` to `ExtraArgs`
+        - Enable webhook server in the config, in the Server Configuration settings, find webhooks, and set:
+            - `Queue Start Webhook` to eg `http://localhost:7802/text_unload`
+            - `Queue Empty Webhook` to eg `http://localhost:7802/text_reload`
+            - `Queue End Delay` low enough to not be a nuisance to your bot
 
 # Config
 
@@ -36,7 +41,7 @@ It's hardcoded to use the tools I prefer (eg text-gen-webui), so, if you want di
 
 ```yml
 # Text-Generation-WebUI
-textgen_url: http://127.0.0.1:7861
+textgen_url: http://127.0.0.1:7860
 # Max timeout for a text response, in minutes.
 textgen_timeout: 2
 max_new_tokens: 1000
@@ -70,6 +75,10 @@ use_aitemplate: false
 # Discord
 discord_token: abc123
 image_log_channel: 123456
+
+# Internal webhook server. Set to 'none' if you don't want internal webhooks.
+web_listen: http://127.0.0.1
+web_port: 7802
 
 # Message prefixes to image prompt format. You can apply presets n wotnot, standard StableSwarmUI prompt format.
 # Remove this section if you don't want images.

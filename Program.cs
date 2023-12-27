@@ -9,6 +9,8 @@ using FreneticUtilities.FreneticExtensions;
 using System.Net.Http.Headers;
 using Discord.Rest;
 using ISImage = SixLabors.ImageSharp.Image;
+using System.Net;
+using System.Runtime.Loader;
 
 namespace SimpleDiscordAIBot;
 
@@ -41,7 +43,7 @@ public static class Util
     /// <summary>Sends a JSON object post and receives a JSON object back.</summary>
     public static async Task<JObject> PostJson(this HttpClient client, string url, JObject data)
     {
-        return (await (await client.PostAsync(url, JSONContent(data))).Content.ReadAsStringAsync()).ParseToJson();
+        return (await (await client.PostAsync(url, JSONContent(data), Program.GlobalCancel.Token)).Content.ReadAsStringAsync()).ParseToJson();
     }
 }
 
@@ -165,6 +167,70 @@ public static class TextGenAPI
         Client.Timeout = TimeSpan.FromMinutes(ConfigHandler.Config.GetFloat("textgen_timeout", 2).Value);
     }
 
+    public static async Task<(string, string[])> IdentifyCurrentModel()
+    {
+        string data = await Client.GetStringAsync($"{ConfigHandler.Config.GetString("textgen_url")}/v1/internal/model/info");
+        JObject parsed = data.ParseToJson();
+        string modelName = parsed["model_name"].ToString();
+        string[] loras = parsed["lora_names"].Select(l => l.ToString()).ToArray();
+        return (modelName, loras);
+    }
+
+    public static async Task UnloadModel()
+    {
+        Console.WriteLine("will send unload model");
+        await Client.PostAsync($"{ConfigHandler.Config.GetString("textgen_url")}/v1/internal/model/unload", new StringContent("{}"), Program.GlobalCancel.Token);
+    }
+
+    public static async Task LoadModel(string name, string[] loras)
+    {
+        JObject jData = new()
+        {
+            ["model_name"] = name
+        };
+        JObject loraData = new()
+        {
+            ["lora_names"] = new JArray(loras)
+        };
+        string serialized = JsonConvert.SerializeObject(jData);
+        string loraSerialized = JsonConvert.SerializeObject(loraData);
+        Console.WriteLine($"will send load model: {serialized}, loras = {loraSerialized}");
+        await Client.PostAsync($"{ConfigHandler.Config.GetString("textgen_url")}/v1/internal/model/load", new StringContent(serialized, StringConversionHelper.UTF8Encoding, "application/json"), Program.GlobalCancel.Token);
+        if (loras.Any())
+        {
+            await Client.PostAsync($"{ConfigHandler.Config.GetString("textgen_url")}/v1/internal/lora/load", new StringContent(loraSerialized, StringConversionHelper.UTF8Encoding, "application/json"), Program.GlobalCancel.Token);
+        }
+    }
+
+    public static string LastModel = null;
+
+    public static string[] LastLoras = null;
+
+    public static volatile bool IsUnloaded = false;
+
+    public static volatile bool IsGenerating = false;
+
+    public static async Task TempUnload()
+    {
+        if (IsUnloaded)
+        {
+            return;
+        }
+        IsUnloaded = true;
+        (LastModel, LastLoras) = await IdentifyCurrentModel();
+        await UnloadModel();
+    }
+
+    public static async Task ReloadIfUnloaded()
+    {
+        if (!IsUnloaded)
+        {
+            return;
+        }
+        await LoadModel(LastModel, LastLoras);
+        IsUnloaded = false;
+    }
+
     public static async Task<string> SendRequest(string prompt, LLMParams llmParam)
     {
         JObject jData = new()
@@ -211,11 +277,103 @@ public static class TextGenAPI
         }
         string serialized = JsonConvert.SerializeObject(jData);
         Console.WriteLine($"will send: {serialized}");
-        HttpResponseMessage response = await Client.PostAsync($"{ConfigHandler.Config.GetString("textgen_url")}/v1/completions", new StringContent(serialized, StringConversionHelper.UTF8Encoding, "application/json"));
-        string responseText = await response.Content.ReadAsStringAsync();
-        Console.WriteLine($"Response {(int)response.StatusCode} {response.StatusCode} text: {responseText}");
-        string result = JObject.Parse(responseText)["choices"][0]["text"].ToString();
-        return result;
+        IsGenerating = true;
+        try
+        {
+            while (IsUnloaded)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(0.5), Program.GlobalCancel.Token);
+            }
+            HttpResponseMessage response = await Client.PostAsync($"{ConfigHandler.Config.GetString("textgen_url")}/v1/completions", new StringContent(serialized, StringConversionHelper.UTF8Encoding, "application/json"), Program.GlobalCancel.Token);
+            string responseText = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Response {(int)response.StatusCode} {response.StatusCode} text: {responseText}");
+            string result = JObject.Parse(responseText)["choices"][0]["text"].ToString();
+            return result;
+        }
+        finally
+        {
+            IsGenerating = false;
+        }
+    }
+}
+
+public static class WebhookServer
+{
+    public static string Listen;
+
+    public static int Port;
+
+    public static HttpListener Listener;
+
+    public static void Init()
+    {
+        string listenStr = ConfigHandler.Config.GetString("web_listen", "none");
+        string portStr = ConfigHandler.Config.GetString("web_port", "none");
+        if (listenStr.ToLowerFast() == "none" || string.IsNullOrWhiteSpace(listenStr) || portStr.ToLowerFast() == "none" || string.IsNullOrWhiteSpace(portStr))
+        {
+            Listen = null;
+            Port = 0;
+            return;
+        }
+        else
+        {
+            Listen = listenStr;
+            Port = int.Parse(portStr);
+        }
+        Listener = new HttpListener();
+        Listener.Prefixes.Add($"{listenStr}:{Port}/");
+        Listener.Start();
+        new Thread(Loop).Start();
+    }
+
+    public static void Loop()
+    {
+        while (!Program.GlobalCancel.IsCancellationRequested)
+        {
+            try
+            {
+                HttpListenerContext context = Listener.GetContext();
+                if (context.Request.HttpMethod != "POST")
+                {
+                    context.Response.StatusCode = 405;
+                    context.Response.Close();
+                    continue;
+                }
+                string path = context.Request.Url.AbsolutePath;
+                if (path == "/text_unload")
+                {
+                    try
+                    {
+                        TextGenAPI.TempUnload().Wait();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error unloading: {ex}");
+                    }
+                    context.Response.StatusCode = 200;
+                    context.Response.Close();
+                    continue;
+                }
+                if (path == "/text_reload")
+                {
+                    try
+                    {
+                        TextGenAPI.ReloadIfUnloaded().Wait();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error reloading: {ex}");
+                    }
+                    context.Response.StatusCode = 200;
+                    context.Response.Close();
+                    continue;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Webhook server error: {ex}");
+            }
+        }
     }
 }
 
@@ -224,6 +382,8 @@ public static class Program
     public static DiscordSocketClient Client;
 
     public static AsciiMatcher AlphanumericMatcher = new(AsciiMatcher.BothCaseLetters + AsciiMatcher.Digits);
+
+    public static CancellationTokenSource GlobalCancel = new();
 
     public record class CachedMessage(string Content, ulong RefId, ulong Author, string AuthorName);
 
@@ -254,15 +414,25 @@ public static class Program
 
     public record struct MessageHolder(bool IsBot, string Name, string Text);
 
+    public static void Shutdown()
+    {
+        GlobalCancel.Cancel();
+        WebhookServer.Listener?.Stop();
+    }
+
     public static void Main()
     {
+        SpecialTools.Internationalize();
         Console.WriteLine("Starting...");
+        AssemblyLoadContext.Default.Unloading += (_) => Shutdown();
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => Shutdown();
         DiscordSocketConfig config = new()
         {
             MessageCacheSize = 50,
             AlwaysDownloadUsers = true,
             GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent
         };
+        WebhookServer.Init();
         Client = new DiscordSocketClient(config);
         Client.Ready += () =>
         {
