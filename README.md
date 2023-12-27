@@ -77,7 +77,8 @@ discord_token: abc123
 image_log_channel: 123456
 
 # Internal webhook server. Set to 'none' if you don't want internal webhooks.
-web_listen: http://127.0.0.1
+# Be careful about the address, eg '127.0.0.1' and 'localhost' are not the same.
+web_listen: http://localhost
 web_port: 7802
 
 # Message prefixes to image prompt format. You can apply presets n wotnot, standard StableSwarmUI prompt format.
