@@ -169,10 +169,12 @@ public static class TextGenAPI
 
     public static async Task<(string, string[])> IdentifyCurrentModel()
     {
+        Console.WriteLine("Will try to identify current model");
         string data = await Client.GetStringAsync($"{ConfigHandler.Config.GetString("textgen_url")}/v1/internal/model/info");
         JObject parsed = data.ParseToJson();
         string modelName = parsed["model_name"].ToString();
         string[] loras = parsed["lora_names"].Select(l => l.ToString()).ToArray();
+        Console.WriteLine($"Identified model: {modelName}, loras = [{string.Join(", ", loras)}]");
         return (modelName, loras);
     }
 
@@ -309,6 +311,7 @@ public static class WebhookServer
     {
         string listenStr = ConfigHandler.Config.GetString("web_listen", "none");
         string portStr = ConfigHandler.Config.GetString("web_port", "none");
+        Console.WriteLine($"Webhook server configured as {listenStr}:{portStr}");
         if (listenStr.ToLowerFast() == "none" || string.IsNullOrWhiteSpace(listenStr) || portStr.ToLowerFast() == "none" || string.IsNullOrWhiteSpace(portStr))
         {
             Listen = null;
@@ -322,6 +325,7 @@ public static class WebhookServer
         }
         Listener = new HttpListener();
         Listener.Prefixes.Add($"{listenStr}:{Port}/");
+        Console.WriteLine("Starting web listener");
         Listener.Start();
         new Thread(Loop).Start();
     }
@@ -333,13 +337,14 @@ public static class WebhookServer
             try
             {
                 HttpListenerContext context = Listener.GetContext();
+                string path = context.Request.Url.AbsolutePath;
+                Console.WriteLine($"Got web request: {context.Request.HttpMethod} '{path}'");
                 if (context.Request.HttpMethod != "POST")
                 {
                     context.Response.StatusCode = 405;
                     context.Response.Close();
                     continue;
                 }
-                string path = context.Request.Url.AbsolutePath;
                 if (path == "/text_unload")
                 {
                     try
