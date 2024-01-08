@@ -439,7 +439,7 @@ public static class Program
         };
         WebhookServer.Init();
         Client = new DiscordSocketClient(config);
-        Client.Ready += async () =>
+        async Task onReady()
         {
             Console.WriteLine("Bot ready.");
             string statusType = ConfigHandler.Config.GetString("status_type", "none");
@@ -448,6 +448,7 @@ public static class Program
                 await Client.SetGameAsync(ConfigHandler.Config.GetString("status"), type: Enum.Parse<ActivityType>(statusType, true));
             }
         };
+        Client.Ready += onReady;
         LLMParams llmParams = new()
         {
             stopping_strings = ConfigHandler.Config.GetStringList("stopping_strings").Select(s => s.Replace("\\n", "\n")).ToArray(),
@@ -650,6 +651,7 @@ public static class Program
         Console.WriteLine("Connecting to Discord...");
         Client.StartAsync().Wait();
         Console.WriteLine("Running Discord!");
+        onReady().Wait();
         while (true)
         {
             string input = Console.ReadLine();
