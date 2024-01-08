@@ -75,6 +75,9 @@ use_aitemplate: false
 # Discord
 discord_token: abc123
 image_log_channel: 123456
+# 'none' to disable, or Playing, Streaming, Listening, Watching, Competing, CustomStatus
+status_type: watching
+status: language models
 
 # Internal webhook server. Set to 'none' if you don't want internal webhooks.
 # Be careful about the address, eg '127.0.0.1' and 'localhost' are not the same.
