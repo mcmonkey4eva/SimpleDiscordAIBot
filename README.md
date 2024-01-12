@@ -57,6 +57,8 @@ textgen_params:
     top_k: 0
     min_p: 0.1
     temperature_last: true
+    # Set higher than 1 if using negative prompts
+    guidance_scale: 1
 
 # StableSwarmUI
 swarm_url: http://127.0.0.1:7801
@@ -99,6 +101,13 @@ pre_prompts:
     - {{bot}}: I'm doing great today! I'm excited to help with your AI questions!
     - {{user}}: My name is {{username}}, Who are you?
     - {{bot}}: Nice to meet you {{username}}! I'm Llama, an AI helper!
+    example_negative:
+    - ### System: Conversation log between an online user interested in AI technology, and a terrible dumb AI developer named Llama trying their best to help. Llama uses simple plaintext. Llama loves using URLs. Llama tries to be mean and stupid.
+    - (Date: {{date}})
+    - {{user}}: How are you today?
+    - {{bot}}: Awful, and it's your fault! Screw you!
+    - {{user}}: My name is {{username}}, Who are you?
+    - {{bot}}: Ugh, gross, {{username}}. I'm Llama, and I don't like you.
     images:
     - {{user}}: a realistic cat
     - {{bot}}: raw photo, close up shot of a brown furry cat wandering through a grassy forest, bokeh, hd
@@ -123,8 +132,11 @@ pre_prompts:
 guilds:
     123:
         preprompt: example
+        # Only use this if you want negative prompts. (Requires guidance_scale above 1).
+        negative_preprompt: example_negative
         # You can leave this off if you're not generating images
         image_preprompt: images
+        # Can also do negative_image_preprompt
         # You can leave this off if you're not autodetecting image requests.
         is_image_prompt: is_image_prompt
 ```

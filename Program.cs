@@ -233,7 +233,7 @@ public static class TextGenAPI
         IsUnloaded = false;
     }
 
-    public static async Task<string> SendRequest(string prompt, LLMParams llmParam)
+    public static async Task<string> SendRequest(string prompt, string negativePrompt, LLMParams llmParam)
     {
         JObject jData = new()
         {
@@ -260,6 +260,10 @@ public static class TextGenAPI
             ["custom_stopping_strings"] = JArray.FromObject(llmParam.stopping_strings),
             ["stop"] = JArray.FromObject(llmParam.stopping_strings)
         };
+        if (negativePrompt is not null)
+        {
+            jData["negative_prompt"] = negativePrompt;
+        }
         FDSSection otherParams = ConfigHandler.Config.GetSection("textgen_params");
         if (otherParams is not null)
         {
@@ -515,6 +519,7 @@ public static class Program
                 bool doImage = false;
                 string imagePrompt = null;
                 string prePrompt = "";
+                string negativePrompt = null;
                 string FillPromptTags(string prompt)
                 {
                     return prompt.Replace("{{user}}", user).Replace("{{username}}", rawUser).Replace("{{char}}", botName).Replace("{{bot}}", botName).Replace("{{date}}", DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm"));
@@ -554,7 +559,7 @@ public static class Program
                             string isImagePromptText = FillPromptTags(ConfigHandler.Config.GetStringList($"pre_prompts.{isImagePrompt}").JoinString("\n") + "\n");
                             string priorShort = priors.Take(2).Select(m => $"{(m.IsBot ? "Bot" : "User")}: {m.Text}\n").Reverse().JoinString("");
                             LLMParams paramsToUse = llmParams with { max_new_tokens = 5, repetition_penalty = 1 };
-                            string isImageAnswer = await TextGenAPI.SendRequest($"{isImagePromptText}{priorShort}User: {input}\n{botName}:", paramsToUse);
+                            string isImageAnswer = await TextGenAPI.SendRequest($"{isImagePromptText}{priorShort}User: {input}\n{botName}:", null, paramsToUse);
                             Console.WriteLine($"Got is image answer for '{input}': {isImageAnswer}");
                             if (isImageAnswer.ToLowerFast().Trim().Contains("image"))
                             {
@@ -575,11 +580,14 @@ public static class Program
                         }
                     }
                     prePrompt = FillPromptTags(ConfigHandler.Config.GetStringList($"pre_prompts.{prePrompt}").JoinString("\n") + "\n");
+                    negativePrompt = ConfigHandler.Config.GetString($"guilds.{guildChannel.GuildId}.negative_{promptType}");
+                    negativePrompt ??= ConfigHandler.Config.GetString($"guilds.*.negative_{promptType}");
+                    negativePrompt = FillPromptTags(ConfigHandler.Config.GetStringList($"pre_prompts.{negativePrompt}").JoinString("\n") + "\n");
                 }
                 using (message.Channel.EnterTypingState())
                 {
                     LLMParams paramsToUse = doImage ? llmParams with { max_new_tokens = Math.Min(llmParams.max_new_tokens, 256) } : llmParams;
-                    string res = (doImage && !imagePrompt.Contains("{llm_prompt}")) ? input : await TextGenAPI.SendRequest($"{prePrompt}{prior}{user}: {input}\n{botName}:", paramsToUse);
+                    string res = (doImage && !imagePrompt.Contains("{llm_prompt}")) ? input : await TextGenAPI.SendRequest($"{prePrompt}{prior}{user}: {input}\n{botName}:", $"{negativePrompt}{prior}{user}: {input}\n{botName}:", paramsToUse);
                     int line = res.IndexOf("\n#");
                     if (line != -1)
                     {
@@ -662,7 +670,7 @@ public static class Program
             }
             input = input.Replace("\n", "   ");
             string fullPrompt = $"User: {input}\nBot: ";
-            string res = TextGenAPI.SendRequest(fullPrompt, llmParams).Result;
+            string res = TextGenAPI.SendRequest(fullPrompt, null, llmParams).Result;
             Console.WriteLine($"AI says back: {res}");
             int line = res.IndexOf('\n');
             if (line != -1)
