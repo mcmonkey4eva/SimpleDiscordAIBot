@@ -587,7 +587,8 @@ public static class Program
                     prePrompt = FillPromptTags(ConfigHandler.Config.GetStringList($"pre_prompts.{prePrompt}").JoinString("\n") + "\n");
                     negativePrompt = ConfigHandler.Config.GetString($"guilds.{guildChannel.GuildId}.negative_{promptType}");
                     negativePrompt ??= ConfigHandler.Config.GetString($"guilds.*.negative_{promptType}");
-                    negativePrompt = FillPromptTags(ConfigHandler.Config.GetStringList($"pre_prompts.{negativePrompt}").JoinString("\n") + "\n");
+                    string neg = ConfigHandler.Config.GetStringList($"pre_prompts.{negativePrompt}")?.JoinString("\n");
+                    negativePrompt = neg is null ? "" : FillPromptTags(neg + "\n");
                 }
                 using (message.Channel.EnterTypingState())
                 {
