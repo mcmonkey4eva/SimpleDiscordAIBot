@@ -135,6 +135,11 @@ public static class SwarmAPI
             {
                 Console.WriteLine($"Raw response was: {generated}");
             }
+            List<(byte[], string)> gifs = images.Where(img => img.Item2 == "gif").ToList();
+            if (gifs.Count == 1)
+            {
+                return gifs;
+            }
             return images;
         });
     }

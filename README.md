@@ -115,19 +115,14 @@ pre_prompts:
     - {{bot}}: concept art of an ancient ruined city filled with concrete rubble of once-great statues, post-apocalyptic, highly stylized, video game concept art, moody atmosphere, magical
     is_image_prompt:
     - ### System: You will respond 'image' if the user's final message in a conversation is requesting image generation (asking for an image explicitly, describing an image, or requesting a modification to an image), or 'other' if they are doing anything else (such as asking a question, giving commentary, holding conversation, or etc.)
-    - ### Log
-    - User: Hello, how are you?
+    - {{user}}: Hello, how are you?
     - {{bot}}: other
-    - ### Log
-    - User: draw a cow
+    - {{user}}: draw a cow
     - {{bot}}: image
-    - ### Log
-    - User: what is a cow?
+    - {{user}}: what is a cow?
     - {{bot}}: other
-    - ### Log
-    - User: an astronaut on the moon
+    - {{user}}: an astronaut on the moon
     - {{bot}}: image
-    - ### Log
 
 guilds:
     123:
