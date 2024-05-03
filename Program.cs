@@ -8,9 +8,12 @@ using FreneticUtilities.FreneticDataSyntax;
 using FreneticUtilities.FreneticExtensions;
 using System.Net.Http.Headers;
 using Discord.Rest;
-using ISImage = SixLabors.ImageSharp.Image;
 using System.Net;
 using System.Runtime.Loader;
+using ISImage = SixLabors.ImageSharp.Image;
+using ISImageRGBA32 = SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp;
 
 namespace SimpleDiscordAIBot;
 
@@ -636,7 +639,7 @@ public static class Program
                                 height = Math.Max(height, isImgs[i].Height);
                             }
                             int rows = (int)Math.Ceiling((double)isImgs.Length / sqrt);
-                            using Image<Rgba32> img = new(width * sqrt, height * rows);
+                            using ISImageRGBA32 img = new(width * sqrt, height * rows);
                             for (int i = 0; i < isImgs.Length; i++)
                             {
                                 int x = (i % sqrt) * width, y = (i / sqrt) * height;
