@@ -27,7 +27,7 @@ It's hardcoded to use the tools I prefer (eg text-gen-webui), so, if you want di
 - A [registered Discord bot](https://discord.com/developers/applications) with message content intent enabled.
 - [DotNET SDK 7.0](https://dotnet.microsoft.com/en-us/download/dotnet/7.0)
 - [Text-Generation-WebUI](https://github.com/oobabooga/text-generation-webui) for running the LLM (Language Model) backend part, with a model of your choosing installed on it and working. Launch it with `--api --api-blocking-port 7861` (feel free to choose your own port, just don't reuse the main UI's port. Also don't expose it to the open internet)
-- [StableSwarmUI](https://github.com/Stability-AI/StableSwarmUI) if you want image generation. Launch it as normal. Make sure it's visible to the bot, and probably not to the open internet.
+- [SwarmUI](https://github.com/mcmonkeyprojects/SwarmUI) if you want image generation. Launch it as normal. Make sure it's visible to the bot, and probably not to the open internet.
     - If the Swarm instance is on the same GPU and you want to avoid VRAM issues:
         - in the Backends tab edit Comfy and add `--disable-smart-memory` to `ExtraArgs`
         - Enable webhook server in the config, in the Server Configuration settings, find webhooks, and set:
@@ -47,7 +47,9 @@ textgen_timeout: 2
 max_new_tokens: 1000
 stopping_strings:
 - \n###
+# Used if the username is not valid plaintext (eg weird unicode stuff)
 user_name_default: Human
+# Always used
 bot_name: Assistant
 prefix: \x### \x
 
@@ -60,7 +62,7 @@ textgen_params:
     # Set higher than 1 if using negative prompts
     guidance_scale: 1
 
-# StableSwarmUI
+# SwarmUI
 swarm_url: http://127.0.0.1:7801
 swarm_model: OfficialStableDiffusion/sd_xl_base_1.0.safetensors
 images: 1
@@ -71,8 +73,6 @@ image_height: 1024
 image_cfg: 7
 image_steps: 20
 image_negative: nsfw, low quality
-# Set true if your swarm instance has aitemplate and you want it. On modern NV cards, AIT is noticeably faster than not having AIT.
-use_aitemplate: false
 
 # Discord
 discord_token: abc123
@@ -86,7 +86,7 @@ status: language models
 web_listen: http://localhost
 web_port: 7802
 
-# Message prefixes to image prompt format. You can apply presets n wotnot, standard StableSwarmUI prompt format.
+# Message prefixes to image prompt format. You can apply presets n wotnot, standard SwarmUI prompt format.
 # Remove this section if you don't want images.
 prefixes:
     [image]: {llm_prompt}
@@ -151,7 +151,7 @@ guilds:
 
 The MIT License (MIT)
 
-Copyright (c) 2023 Alex "mcmonkey" Goodwin
+Copyright (c) 2023-2024 Alex "mcmonkey" Goodwin
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
