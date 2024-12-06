@@ -71,7 +71,7 @@ public record class LLMParams
     public int seed = -1;
     public bool add_bos_token = false;
     public bool skip_special_tokens = true;
-    public string[] stopping_strings = Array.Empty<string>();
+    public string[] stopping_strings = [];
 }
 
 public static class SwarmAPI
@@ -94,7 +94,7 @@ public static class SwarmAPI
 
     public static async Task GetSession()
     {
-        JObject sessData = await Client.PostJson($"{Address}/API/GetNewSession", new());
+        JObject sessData = await Client.PostJson($"{Address}/API/GetNewSession", []);
         Session = sessData["session_id"].ToString();
     }
 
@@ -206,7 +206,7 @@ public static class TextGenAPI
         string loraSerialized = JsonConvert.SerializeObject(loraData);
         Console.WriteLine($"will send load model: {serialized}, loras = {loraSerialized}");
         await Client.PostAsync($"{ConfigHandler.Config.GetString("textgen_url")}/v1/internal/model/load", new StringContent(serialized, StringConversionHelper.UTF8Encoding, "application/json"), Program.GlobalCancel.Token);
-        if (loras.Any())
+        if (loras.Length > 0)
         {
             await Client.PostAsync($"{ConfigHandler.Config.GetString("textgen_url")}/v1/internal/lora/load", new StringContent(loraSerialized, StringConversionHelper.UTF8Encoding, "application/json"), Program.GlobalCancel.Token);
         }
@@ -405,7 +405,7 @@ public static class Program
 
     public record class CachedMessage(string Content, ulong RefId, ulong Author, string AuthorName);
 
-    public static Dictionary<ulong, CachedMessage> MessageCache = new();
+    public static Dictionary<ulong, CachedMessage> MessageCache = [];
 
     public static async Task<CachedMessage> GetMessageCached(ulong channel, ulong id)
     {
@@ -480,7 +480,7 @@ public static class Program
                 string user = prefix + ConfigHandler.Config.GetString("user_name_default");
                 string botName = prefix + ConfigHandler.Config.GetString("bot_name");
                 bool isSelfRef = message.Content.Contains($"<@{Client.CurrentUser.Id}>") || message.Content.Contains($"<@!{Client.CurrentUser.Id}>");
-                List<MessageHolder> priors = new();
+                List<MessageHolder> priors = [];
                 if (message.Reference is not null && message.Reference.ChannelId == message.Channel.Id)
                 {
                     CachedMessage cache = await GetMessageCached(message.Channel.Id, message.Reference.MessageId.Value);
@@ -648,7 +648,7 @@ public static class Program
                             using MemoryStream imgStream2 = new();
                             img.SaveAsJpeg(imgStream2);
                             imgStream2.Position = 0;
-                            imgs = new() { (imgStream2.ToArray(), "jpg") };
+                            imgs = [(imgStream2.ToArray(), "jpg")];
                         }
                         embedded.Description = $"<@{message.Author.Id}>'s AI-generated image";
                         ulong logChan = ConfigHandler.Config.GetUlong("image_log_channel").Value;
