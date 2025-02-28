@@ -129,7 +129,7 @@ public static class SwarmAPI
             List<(byte[], string)> images = generated["images"].Select(img =>
             {
                 string type = img.ToString().After("data:").Before(";");
-                string ext = type == "image/gif" ? "gif" : "jpg";
+                string ext = type == "image/gif" ? "gif" : (type == "image/webp" ? "webp" : "jpg");
                 byte[] data = Convert.FromBase64String(img.ToString().After(";base64,"));
                 return (data, ext);
             }).ToList();
@@ -138,7 +138,7 @@ public static class SwarmAPI
             {
                 Console.WriteLine($"Raw response was: {generated}");
             }
-            List<(byte[], string)> gifs = images.Where(img => img.Item2 == "gif").ToList();
+            List<(byte[], string)> gifs = images.Where(img => img.Item2 == "gif" || img.Item2 == "webp").ToList();
             if (gifs.Count == 1)
             {
                 return gifs;
