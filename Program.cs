@@ -622,6 +622,7 @@ public static class Program
                     string actualPrompt = imagePrompt.Replace(imagePrompt.Contains("{llm_prompt}") ? "{llm_prompt}" : "{prompt}", res.Replace("<", "").Replace(':', '_'));
                     IUserMessage botMessage = await (message as IUserMessage).ReplyAsync(embed: embedded.Build(), allowedMentions: AllowedMentions.None);
                     List<(byte[], string)> imgs = await SwarmAPI.SendRequest(actualPrompt);
+                    string msgText = null;
                     if (imgs.Count == 0)
                     {
                         embedded.Description = "Failed to generate :(";
@@ -654,9 +655,23 @@ public static class Program
                         ulong logChan = ConfigHandler.Config.GetUlong("image_log_channel").Value;
                         using MemoryStream imgStream = new(imgs[0].Item1);
                         RestUserMessage msg = await (Client.GetChannel(logChan) as SocketTextChannel).SendFileAsync(imgStream, $"generated_img_for_{message.Author.Id}.{imgs[0].Item2}", text: botMessage.GetJumpUrl());
-                        embedded.ImageUrl = msg.Attachments.First().Url;
+                        if (imgs[0].Item2 == "webp")
+                        {
+                            msgText = msg.Attachments.First().Url;
+                        }
+                        else
+                        {
+                            embedded.ImageUrl = msg.Attachments.First().Url;
+                        }
                     }
-                    await botMessage.ModifyAsync(m => m.Embed = embedded.Build());
+                    await botMessage.ModifyAsync(m =>
+                    {
+                        if (msgText is not null)
+                        {
+                            m.Content = msgText;
+                        }
+                        m.Embed = embedded.Build();
+                    });
                 }
             }
             catch (Exception ex)
