@@ -624,9 +624,25 @@ public static class Program
                     List<(byte[], string)> imgs = await SwarmAPI.SendRequest(actualPrompt);
                     string msgText = null;
                     List<FileAttachment> attachments = null;
+                    async Task apply()
+                    {
+                        await botMessage.ModifyAsync(m =>
+                        {
+                            if (msgText is not null)
+                            {
+                                m.Content = msgText;
+                            }
+                            if (attachments is not null)
+                            {
+                                m.Attachments = Optional.Create<IEnumerable<FileAttachment>>(attachments);
+                            }
+                            m.Embed = embedded.Build();
+                        });
+                    }
                     if (imgs.Count == 0)
                     {
                         embedded.Description = "Failed to generate :(";
+                        await apply();
                     }
                     else
                     {
@@ -668,19 +684,8 @@ public static class Program
                             RestUserMessage msg = await actualLogChan.SendFileAsync(imgStream, fname, text: botMessage.GetJumpUrl());
                             embedded.ImageUrl = msg.Attachments.First().Url;
                         }
+                        await apply();
                     }
-                    await botMessage.ModifyAsync(m =>
-                    {
-                        if (msgText is not null)
-                        {
-                            m.Content = msgText;
-                        }
-                        if (attachments is not null)
-                        {
-                            m.Attachments = Optional.Create<IEnumerable<FileAttachment>>(attachments);
-                        }
-                        m.Embed = embedded.Build();
-                    });
                 }
             }
             catch (Exception ex)
