@@ -623,6 +623,7 @@ public static class Program
                     IUserMessage botMessage = await (message as IUserMessage).ReplyAsync(embed: embedded.Build(), allowedMentions: AllowedMentions.None);
                     List<(byte[], string)> imgs = await SwarmAPI.SendRequest(actualPrompt);
                     string msgText = null;
+                    List<FileAttachment> attachments = null;
                     if (imgs.Count == 0)
                     {
                         embedded.Description = "Failed to generate :(";
@@ -654,13 +655,17 @@ public static class Program
                         embedded.Description = $"<@{message.Author.Id}>'s AI-generated image";
                         ulong logChan = ConfigHandler.Config.GetUlong("image_log_channel").Value;
                         using MemoryStream imgStream = new(imgs[0].Item1);
-                        RestUserMessage msg = await (Client.GetChannel(logChan) as SocketTextChannel).SendFileAsync(imgStream, $"generated_img_for_{message.Author.Id}.{imgs[0].Item2}", text: botMessage.GetJumpUrl());
+                        string fname = $"generated_img_for_{message.Author.Id}.{imgs[0].Item2}";
+                        SocketTextChannel actualLogChan = Client.GetChannel(logChan) as SocketTextChannel;
                         if (imgs[0].Item2 == "webp")
                         {
-                            msgText = msg.Attachments.First().Url;
+                            attachments = [];
+                            attachments.Add(new FileAttachment(imgStream, fname));
+                            await actualLogChan.SendMessageAsync(text: $"Video: {botMessage.GetJumpUrl()}");
                         }
                         else
                         {
+                            RestUserMessage msg = await actualLogChan.SendFileAsync(imgStream, fname, text: botMessage.GetJumpUrl());
                             embedded.ImageUrl = msg.Attachments.First().Url;
                         }
                     }
@@ -669,6 +674,10 @@ public static class Program
                         if (msgText is not null)
                         {
                             m.Content = msgText;
+                        }
+                        if (attachments is not null)
+                        {
+                            m.Attachments = Optional.Create<IEnumerable<FileAttachment>>(attachments);
                         }
                         m.Embed = embedded.Build();
                     });
