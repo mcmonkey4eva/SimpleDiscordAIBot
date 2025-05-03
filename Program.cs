@@ -121,24 +121,40 @@ public static class SwarmAPI
             {
                 request["enableaitemplate"] = true;
             }
-            JObject generated = await Client.PostJson($"{Address}/API/GenerateText2Image", request);
+            JObject generated;
+            try
+            {
+                generated = await Client.PostJson($"{Address}/API/GenerateText2Image", request);
+            }
+            catch (JsonReaderException ex)
+            {
+                if (ex.Message.StartsWith("Failed to parse JSON ``:")) // It probably crashed and restarted.
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(1.5));
+                    generated = await Client.PostJson($"{Address}/API/GenerateText2Image", request);
+                }
+                else
+                {
+                    throw;
+                }
+            }
             if (generated.TryGetValue("error_id", out JToken errorId) && errorId.ToString() == "invalid_session_id")
             {
                 throw new SessionInvalidException();
             }
-            List<(byte[], string)> images = generated["images"].Select(img =>
+            List<(byte[], string)> images = [.. generated["images"].Select(img =>
             {
                 string type = img.ToString().After("data:").Before(";");
                 string ext = type == "image/gif" ? "gif" : (type == "video/webp" ? "webp" : "jpg");
                 byte[] data = Convert.FromBase64String(img.ToString().After(";base64,"));
                 return (data, ext);
-            }).ToList();
+            })];
             Console.WriteLine($"Generate {images.Count} images");
             if (images.Count == 0)
             {
                 Console.WriteLine($"Raw response was: {generated}");
             }
-            List<(byte[], string)> gifs = images.Where(img => img.Item2 == "gif" || img.Item2 == "webp").ToList();
+            List<(byte[], string)> gifs = [.. images.Where(img => img.Item2 == "gif" || img.Item2 == "webp")];
             if (gifs.Count == 1)
             {
                 return gifs;
@@ -181,7 +197,7 @@ public static class TextGenAPI
         string data = await Client.GetStringAsync($"{ConfigHandler.Config.GetString("textgen_url")}/v1/internal/model/info");
         JObject parsed = data.ParseToJson();
         string modelName = parsed["model_name"].ToString();
-        string[] loras = parsed["lora_names"].Select(l => l.ToString()).ToArray();
+        string[] loras = [.. parsed["lora_names"].Select(l => l.ToString())];
         Console.WriteLine($"Identified model: {modelName}, loras = [{string.Join(", ", loras)}]");
         return (modelName, loras);
     }
@@ -464,7 +480,7 @@ public static class Program
         Client.Ready += onReady;
         LLMParams llmParams = new()
         {
-            stopping_strings = ConfigHandler.Config.GetStringList("stopping_strings").Select(s => s.Replace("\\n", "\n")).ToArray(),
+            stopping_strings = [.. ConfigHandler.Config.GetStringList("stopping_strings").Select(s => s.Replace("\\n", "\n"))],
             max_new_tokens = ConfigHandler.Config.GetInt("max_new_tokens", 1000).Value
         };
         Client.MessageReceived += async (message) =>
@@ -648,7 +664,7 @@ public static class Program
                     {
                         if (imgs.Count > 1)
                         {
-                            ISImage[] isImgs = imgs.Select(i => ISImage.Load(i.Item1)).ToArray();
+                            ISImage[] isImgs = [.. imgs.Select(i => ISImage.Load(i.Item1))];
                             int sqrt = (int)Math.Ceiling(Math.Sqrt(isImgs.Length));
                             int width = 0, height = 0;
                             for (int i = 0; i < isImgs.Length; i++)
