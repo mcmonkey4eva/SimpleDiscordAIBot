@@ -318,7 +318,15 @@ public static class TextGenAPI
             HttpResponseMessage response = await Client.PostAsync($"{ConfigHandler.Config.GetString("textgen_url")}/v1/completions", new StringContent(serialized, StringConversionHelper.UTF8Encoding, "application/json"), Program.GlobalCancel.Token);
             string responseText = await response.Content.ReadAsStringAsync();
             Console.WriteLine($"Response {(int)response.StatusCode} {response.StatusCode} text: {responseText}");
-            string result = JObject.Parse(responseText)["choices"][0]["text"].ToString();
+            string result = JObject.Parse(responseText)["choices"][0]["text"].ToString().Trim();
+            if (result.StartsWith("<think>"))
+            {
+                int endThink = result.IndexOf("</think>");
+                if (endThink > 0)
+                {
+                    result = result[(endThink + "</think>".Length)..].Trim();
+                }
+            }
             return result;
         }
         finally
