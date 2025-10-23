@@ -146,6 +146,7 @@ public static class SwarmAPI
             {
                 string type = img.ToString().After("data:").Before(";");
                 string ext = type == "image/gif" ? "gif" : (type == "video/webp" ? "webp" : "jpg");
+                Console.WriteLine($"Generated image of mime-type {type}, interpreting as {ext}");
                 byte[] data = Convert.FromBase64String(img.ToString().After(";base64,"));
                 return (data, ext);
             })];
