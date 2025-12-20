@@ -630,7 +630,7 @@ public static class Program
                 }
                 using (message.Channel.EnterTypingState())
                 {
-                    LLMParams paramsToUse = doImage ? llmParams with { max_new_tokens = Math.Min(llmParams.max_new_tokens, 256) } : llmParams;
+                    LLMParams paramsToUse = doImage ? llmParams with { max_new_tokens = ConfigHandler.Config.GetInt("max_image_tokens", llmParams.max_new_tokens).Value } : llmParams;
                     string res;
                     if (doImage && !imagePrompt.Contains(imagePromptReplaceMe))
                     {
