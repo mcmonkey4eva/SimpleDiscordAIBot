@@ -551,6 +551,7 @@ public static class Program
                 Console.WriteLine($"Got input: {prior} {input}");
                 bool doImage = false;
                 string imagePrompt = null;
+                string imagePromptReplaceMe = "{prompt}";
                 string prePrompt = "";
                 string negativePrompt = null;
                 string FillPromptTags(string prompt)
@@ -575,6 +576,7 @@ public static class Program
                                 imagePrompt = imagePrefixSection.GetString(imgPrefix);
                                 doImage = true;
                                 promptType = "image_preprompt";
+                                imagePromptReplaceMe = "{llm_prompt}";
                                 input = input[imgPrefix.Length..].Trim();
                                 break;
                             }
@@ -599,6 +601,14 @@ public static class Program
                                 doImage = true;
                                 promptType = "image_preprompt";
                                 imagePrompt = ConfigHandler.Config.GetString("prefixes.[image]", "{llm_prompt}");
+                                imagePromptReplaceMe = "{llm_prompt}";
+                                int llmPromptStart = imagePrompt.IndexOf("{llm_prompt:");
+                                int llmPromptEnd = imagePrompt.IndexOf('}', llmPromptStart);
+                                if (llmPromptStart != -1 && llmPromptEnd != -1)
+                                {
+                                    imagePromptReplaceMe = imagePrompt[llmPromptStart..(llmPromptEnd + 1)];
+                                    promptType = imagePrompt[(llmPromptStart + "{llm_prompt:".Length)..llmPromptEnd];
+                                }
                             }
                         }
                     }
@@ -621,7 +631,15 @@ public static class Program
                 using (message.Channel.EnterTypingState())
                 {
                     LLMParams paramsToUse = doImage ? llmParams with { max_new_tokens = Math.Min(llmParams.max_new_tokens, 256) } : llmParams;
-                    string res = (doImage && !imagePrompt.Contains("{llm_prompt}")) ? input : await TextGenAPI.SendRequest($"{prePrompt}{prior}{user}: {input}\n{botName}:", $"{negativePrompt}{prior}{user}: {input}\n{botName}:", paramsToUse);
+                    string res;
+                    if (doImage && !imagePrompt.Contains(imagePromptReplaceMe))
+                    {
+                        res = input;
+                    }
+                    else
+                    {
+                        res = await TextGenAPI.SendRequest($"{prePrompt}{prior}{user}: {input}\n{botName}:", $"{negativePrompt}{prior}{user}: {input}\n{botName}:", paramsToUse);
+                    }
                     int line = res.IndexOf("\n#");
                     if (line != -1)
                     {
@@ -632,8 +650,7 @@ public static class Program
                         res = res[0..1900] + "...";
                     }
                     Console.WriteLine($"\n\n{user}: {input}\n{botName}:{res}\n\n");
-                    res = res.Replace("\\", "\\\\").Replace("<", "\\<").Replace(">", "\\>").Replace("@", "\\@ ")
-                        .Replace("http://", "").Replace("https://", "").Trim();
+                    res = res.Replace("\\", "\\\\").Replace("<", "\\<").Replace(">", "\\>").Replace("@", "\\@ ").Replace("[", "\\[").Replace("]", "\\]").Replace("http://", "").Replace("https://", "").Trim();
                     if (string.IsNullOrWhiteSpace(res))
                     {
                         res = "[Error]";
@@ -644,7 +661,7 @@ public static class Program
                         return;
                     }
                     EmbedBuilder embedded = new EmbedBuilder() { Description = "(Please wait, generating...)" }.WithFooter(res);
-                    string actualPrompt = imagePrompt.Replace(imagePrompt.Contains("{llm_prompt}") ? "{llm_prompt}" : "{prompt}", res.Replace("<", "").Replace(':', '_'));
+                    string actualPrompt = imagePrompt.Replace(imagePrompt.Contains(imagePromptReplaceMe) ? imagePromptReplaceMe : "{prompt}", res.Replace("<", "").Replace(':', '_'));
                     IUserMessage botMessage = await (message as IUserMessage).ReplyAsync(embed: embedded.Build(), allowedMentions: AllowedMentions.None);
                     List<(byte[], string)> imgs = await SwarmAPI.SendRequest(actualPrompt);
                     string msgText = null;
