@@ -608,7 +608,7 @@ public static class Program
                     if (imagePromptReplaceMe == "{llm_prompt}")
                     {
                         int llmPromptStart = imagePrompt.IndexOf("{llm_prompt:");
-                        int llmPromptEnd = imagePrompt.IndexOf('}', llmPromptStart);
+                        int llmPromptEnd = llmPromptStart == -1 ? -1 : imagePrompt.IndexOf('}', llmPromptStart);
                         if (llmPromptStart != -1 && llmPromptEnd != -1)
                         {
                             imagePromptReplaceMe = imagePrompt[llmPromptStart..(llmPromptEnd + 1)];
