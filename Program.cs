@@ -602,15 +602,18 @@ public static class Program
                                 promptType = "image_preprompt";
                                 imagePrompt = ConfigHandler.Config.GetString("prefixes.[image]", "{llm_prompt}");
                                 imagePromptReplaceMe = "{llm_prompt}";
-                                int llmPromptStart = imagePrompt.IndexOf("{llm_prompt:");
-                                int llmPromptEnd = imagePrompt.IndexOf('}', llmPromptStart);
-                                if (llmPromptStart != -1 && llmPromptEnd != -1)
-                                {
-                                    imagePromptReplaceMe = imagePrompt[llmPromptStart..(llmPromptEnd + 1)];
-                                    promptType = imagePrompt[(llmPromptStart + "{llm_prompt:".Length)..llmPromptEnd];
-                                    Console.WriteLine($"Special LLM preprompt request: {promptType} with tag {imagePromptReplaceMe} in image prompt");
-                                }
                             }
+                        }
+                    }
+                    if (imagePromptReplaceMe == "{llm_prompt}")
+                    {
+                        int llmPromptStart = imagePrompt.IndexOf("{llm_prompt:");
+                        int llmPromptEnd = imagePrompt.IndexOf('}', llmPromptStart);
+                        if (llmPromptStart != -1 && llmPromptEnd != -1)
+                        {
+                            imagePromptReplaceMe = imagePrompt[llmPromptStart..(llmPromptEnd + 1)];
+                            promptType = imagePrompt[(llmPromptStart + "{llm_prompt:".Length)..llmPromptEnd];
+                            Console.WriteLine($"Special LLM preprompt request: {promptType} with tag {imagePromptReplaceMe} in image prompt");
                         }
                     }
                     prePrompt = ConfigHandler.Config.GetString($"guilds.{guildChannel.GuildId}.{promptType}");
