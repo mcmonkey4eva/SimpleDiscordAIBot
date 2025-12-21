@@ -608,6 +608,7 @@ public static class Program
                                 {
                                     imagePromptReplaceMe = imagePrompt[llmPromptStart..(llmPromptEnd + 1)];
                                     promptType = imagePrompt[(llmPromptStart + "{llm_prompt:".Length)..llmPromptEnd];
+                                    Console.WriteLine($"Special LLM preprompt request: {promptType} with tag {imagePromptReplaceMe} in image prompt");
                                 }
                             }
                         }
@@ -649,7 +650,7 @@ public static class Program
                     {
                         res = res[0..1900] + "...";
                     }
-                    Console.WriteLine($"\n\n{user}: {input}\n{botName}:{res}\n\n");
+                    Console.WriteLine($"\n\n{user}: {input}\n{botName}: {res}\n\n");
                     res = res.Replace("\\", "\\\\").Replace("<", "\\<").Replace(">", "\\>").Replace("@", "\\@ ").Replace("[", "\\[").Replace("]", "\\]").Replace("http://", "").Replace("https://", "").Trim();
                     if (string.IsNullOrWhiteSpace(res))
                     {
@@ -662,6 +663,7 @@ public static class Program
                     }
                     EmbedBuilder embedded = new EmbedBuilder() { Description = "(Please wait, generating...)" }.WithFooter(res);
                     string actualPrompt = imagePrompt.Replace(imagePrompt.Contains(imagePromptReplaceMe) ? imagePromptReplaceMe : "{prompt}", res.Replace("<", "").Replace(':', '_'));
+                    Console.WriteLine($"Generate image with prompt: {actualPrompt}");
                     IUserMessage botMessage = await (message as IUserMessage).ReplyAsync(embed: embedded.Build(), allowedMentions: AllowedMentions.None);
                     List<(byte[], string)> imgs = await SwarmAPI.SendRequest(actualPrompt);
                     string msgText = null;
