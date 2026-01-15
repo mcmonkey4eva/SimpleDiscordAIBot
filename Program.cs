@@ -145,7 +145,16 @@ public static class SwarmAPI
             List<(byte[], string)> images = [.. generated["images"].Select(img =>
             {
                 string type = img.ToString().After("data:").Before(";");
-                string ext = type == "image/gif" ? "gif" : (type == "video/webp" || type == "image/webp" ? "webp" : "jpg");
+                //string ext = type == "image/gif" ? "gif" : (type == "video/webp" || type == "image/webp" ? "webp" : "jpg");
+                string ext = type switch 
+                {
+                    "image/gif" => "gif",
+                    "video/webp" or "image/webp" => "webp",
+                    "image/png" => "png",
+                    "video/mp4" => "mp4",
+                    "video/webm" => "webm",
+                    _ => "jpg"
+                };
                 Console.WriteLine($"Generated image of mime-type {type}, interpreting as {ext}");
                 byte[] data = Convert.FromBase64String(img.ToString().After(";base64,"));
                 return (data, ext);
@@ -155,7 +164,7 @@ public static class SwarmAPI
             {
                 Console.WriteLine($"Raw response was: {generated}");
             }
-            List<(byte[], string)> gifs = [.. images.Where(img => img.Item2 == "gif" || img.Item2 == "webp")];
+            List<(byte[], string)> gifs = [.. images.Where(img => img.Item2 == "gif" || img.Item2 == "webp" || img.Item2 == "webm" || img.Item2 == "mp4")];
             if (gifs.Count == 1)
             {
                 return gifs;
@@ -720,7 +729,7 @@ public static class Program
                         using MemoryStream imgStream = new(imgs[0].Item1);
                         string fname = $"generated_img_for_{message.Author.Id}.{imgs[0].Item2}";
                         SocketTextChannel actualLogChan = Client.GetChannel(logChan) as SocketTextChannel;
-                        if (imgs[0].Item2 == "webp")
+                        if (imgs[0].Item2 == "webp" || imgs[0].Item2 == "webm" || imgs[0].Item2 == "mp4")
                         {
                             attachments = [];
                             attachments.Add(new FileAttachment(imgStream, fname));
