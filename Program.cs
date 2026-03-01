@@ -604,7 +604,7 @@ public static class Program
                         {
                             string isImagePromptText = FillPromptTags(ConfigHandler.Config.GetStringList($"pre_prompts.{isImagePrompt}").JoinString("\n") + "\n");
                             string priorShort = priors.Take(2).Select(m => $"{(m.IsBot ? "Bot" : "User")}: {m.Text}\n").Reverse().JoinString("");
-                            LLMParams paramsToUse = llmParams with { max_new_tokens = 5, repetition_penalty = 1 };
+                            LLMParams paramsToUse = llmParams with { max_new_tokens = 10, repetition_penalty = 1 };
                             string isImageAnswer = await TextGenAPI.SendRequest($"{isImagePromptText}{priorShort}User: {input}\n{botName}:", null, paramsToUse);
                             Console.WriteLine($"Got is image answer for '{input}': {isImageAnswer}");
                             if (isImageAnswer.ToLowerFast().Trim().StartsWith("image"))
