@@ -71,6 +71,7 @@ public record class LLMParams
     public int seed = -1;
     public bool add_bos_token = false;
     public bool skip_special_tokens = true;
+    public bool ban_eos_token = false;
     public string[] stopping_strings = [];
 }
 
@@ -290,6 +291,7 @@ public static class TextGenAPI
             ["early_stopping"] = llmParam.early_stopping,
             ["seed"] = llmParam.seed,
             ["add_bos_token"] = llmParam.add_bos_token,
+            ["ban_eos_token"] = llmParam.ban_eos_token,
             ["skip_special_tokens"] = llmParam.skip_special_tokens,
             ["custom_stopping_strings"] = JArray.FromObject(llmParam.stopping_strings),
             ["stop"] = JArray.FromObject(llmParam.stopping_strings)
@@ -602,10 +604,10 @@ public static class Program
                         {
                             string isImagePromptText = FillPromptTags(ConfigHandler.Config.GetStringList($"pre_prompts.{isImagePrompt}").JoinString("\n") + "\n");
                             string priorShort = priors.Take(2).Select(m => $"{(m.IsBot ? "Bot" : "User")}: {m.Text}\n").Reverse().JoinString("");
-                            LLMParams paramsToUse = llmParams with { max_new_tokens = 5, repetition_penalty = 1 };
+                            LLMParams paramsToUse = llmParams with { max_new_tokens = 5, repetition_penalty = 1, ban_eos_token = true };
                             string isImageAnswer = await TextGenAPI.SendRequest($"{isImagePromptText}{priorShort}User: {input}\n{botName}:", null, paramsToUse);
                             Console.WriteLine($"Got is image answer for '{input}': {isImageAnswer}");
-                            if (isImageAnswer.ToLowerFast().Trim().Contains("image"))
+                            if (isImageAnswer.ToLowerFast().Trim().StartsWith("image"))
                             {
                                 doImage = true;
                                 promptType = "image_preprompt";
